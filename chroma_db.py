@@ -1,36 +1,44 @@
+
 import chromadb
-from google import genai
-from dotenv import load_dotenv
+from langchain_community.document_loaders import PyPDFDirectoryLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-load_dotenv()
-
+# Paths
 data_path = r"data"
 chroma_path = r"chroma_db"
 
+# Initialize ChromaDB with persistent storage
 chroma_client = chromadb.PersistentClient(path=chroma_path)
 
-collection = chroma_client.get_or_create_collection(name="Linear-Algebra-Notes")
-
-user_query = input("Enter your query: \n\n")
-
-results = collection.query(
-    query_texts=[user_query],
-    n_results=1
+# Create or access the collection
+collection = chroma_client.get_or_create_collection(
+    name="Linear-Algebra-Notes"
 )
 
-client = genai.Client()
+loader = PyPDFDirectoryLoader(data_path)
+documents = loader.load()
 
-system_prompt = """You are a helpful assistant that provides concise and accurate answers based on the provided context. If the context does not contain enough information to answer the question, respond with 'I don't know.
-The data:
-"""+str(results['documents']) + """ 
-"""+str(results['metadatas']) + """
-'"""
+print(f"Loaded {len(documents)} pages from PDF files.")
 
-response = client.models.generate_content(
-    model="gemini-2.5-flash",
-    contents=system_prompt + "\n\nUser question: " + user_query
+# Split documents into smaller chunks
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=500,
+    chunk_overlap=100,
+    length_function=len,
+    is_separator_regex=False
 )
 
-print("\n\n   RESPONSE  \n")
-print(response.text)
+chunks = text_splitter.split_documents(documents)
 
+print(f"Created {len(chunks)} text chunks.")
+
+ids = [f"ID{i}" for i in range(len(chunks))]
+
+collection.upsert(
+    documents=[chunk.page_content for chunk in chunks],
+    metadatas=[chunk.metadata for chunk in chunks],
+    ids=ids
+)
+
+print(f"Stored {len(chunks)} chunks in ChromaDB.")
+print(f"Total chunks in collection: {collection.count()}")
