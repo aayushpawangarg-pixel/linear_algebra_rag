@@ -1,6 +1,7 @@
 import chromadb
 from google import genai
 from dotenv import load_dotenv
+from google.genai import types
 
 load_dotenv()
 
@@ -17,11 +18,7 @@ results = collection.query(
     query_texts=[user_query],
     n_results=3
 )
-print("\n--- RETRIEVED CHUNKS ---\n")
 
-for i, document in enumerate(results["documents"][0], start=1):
-    print(f"\nCHUNK {i}:\n")
-    print(document)
 
 client = genai.Client()
 
@@ -33,7 +30,12 @@ The data:
 
 response = client.models.generate_content(
     model="gemini-3.8-flash",
-    contents=system_prompt + "\n\nUser question: " + user_query
+    contents=system_prompt + "\n\nUser question: " + user_query,
+    config=types.GenerateContentConfig(
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(
+            disable=True
+        )
+    )
 )
 
 print("\nRESPONSE\n")
